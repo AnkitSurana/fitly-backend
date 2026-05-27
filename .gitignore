@@ -1,0 +1,19 @@
+# Never commit credentials
+.env
+*.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+venv/
+.venv/
+*.pyc
+
+# OS
+.DS_Store
+Thumbs.db

@@ -1,0 +1,26 @@
+import os
+from supabase import create_client, Client
+from functools import lru_cache
+
+class Settings:
+    SUPABASE_URL: str = os.getenv("SUPABASE_URL", "")
+    SUPABASE_SERVICE_KEY: str = os.getenv("SUPABASE_SERVICE_KEY", "")
+    SUPABASE_JWT_SECRET: str = os.getenv("SUPABASE_JWT_SECRET", "")
+    OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY", "")
+    RAZORPAY_KEY_ID: str = os.getenv("RAZORPAY_KEY_ID", "")
+    RAZORPAY_KEY_SECRET: str = os.getenv("RAZORPAY_KEY_SECRET", "")
+    RAZORPAY_WEBHOOK_SECRET: str = os.getenv("RAZORPAY_WEBHOOK_SECRET", "")
+
+    # Credit packages (credits, price in paise for INR, price in cents for USD)
+    CREDIT_PACKAGES = [
+        {"id": "starter",    "credits": 20,  "inr": 29900,  "usd": 399,   "label": "Starter",    "popular": False},
+        {"id": "pro",        "credits": 60,  "inr": 79900,  "usd": 999,   "label": "Pro",        "popular": True},
+        {"id": "power",      "credits": 150, "inr": 179900, "usd": 2199,  "label": "Power",      "popular": False},
+    ]
+
+    FREE_CREDITS_ON_SIGNUP = 3
+
+settings = Settings()
+
+def get_supabase() -> Client:
+    return create_client(settings.SUPABASE_URL, settings.SUPABASE_SERVICE_KEY)
