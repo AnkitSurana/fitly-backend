@@ -1,6 +1,6 @@
 from fastapi import FastAPI, Request
-from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, RedirectResponse
+from starlette.middleware.base import BaseHTTPMiddleware
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
@@ -13,37 +13,49 @@ logger = logging.getLogger("fitly")
 limiter = Limiter(key_func=get_remote_address)
 
 app = FastAPI(title="Fitly API", version="1.0.0", docs_url="/docs", redoc_url=None)
-
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
-# ── CORS — allow ALL chrome-extension origins + LinkedIn ─────────────────────
-# We can't predict the extension ID so we allow all chrome-extension:// origins
-app.add_middleware(
-    CORSMiddleware,
-    allow_origin_regex=r"chrome-extension://.*|https://www\.linkedin\.com|https://.*\.onrender\.com",
-    allow_origins=["*"],          # fallback for non-regex clients
-    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allow_headers=["*"],
-    allow_credentials=True,
-    max_age=3600,
-)
+# ── CORS — manual middleware (FastAPI CORSMiddleware conflicts with allow_origins=* + credentials) ──
+class CORSMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        origin = request.headers.get("origin", "")
 
-# ── Fix double slashes (e.g. //credits/payment-callback) ─────────────────────
-@app.middleware("http")
-async def fix_double_slash(request: Request, call_next):
-    if "//" in request.url.path:
-        fixed = request.url.path.replace("//", "/")
-        new_url = str(request.url).replace(request.url.path, fixed, 1)
-        return RedirectResponse(url=new_url, status_code=301)
-    return await call_next(request)
+        # Handle preflight
+        if request.method == "OPTIONS":
+            response = JSONResponse(content={}, status_code=200)
+            response.headers["Access-Control-Allow-Origin"]  = origin or "*"
+            response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS"
+            response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization"
+            response.headers["Access-Control-Allow-Credentials"] = "true"
+            response.headers["Access-Control-Max-Age"] = "3600"
+            return response
+
+        response = await call_next(request)
+        response.headers["Access-Control-Allow-Origin"]  = origin or "*"
+        response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS"
+        response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization"
+        response.headers["Access-Control-Allow-Credentials"] = "true"
+        return response
+
+app.add_middleware(CORSMiddleware)
+
+# ── Fix double slashes ────────────────────────────────────────────────────────
+class DoubleSlashMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        if "//" in request.url.path:
+            fixed = request.url.path.replace("//", "/")
+            new_url = str(request.url).replace(request.url.path, fixed, 1)
+            return RedirectResponse(url=new_url, status_code=301)
+        return await call_next(request)
+
+app.add_middleware(DoubleSlashMiddleware)
 
 app.include_router(auth.router,     prefix="/auth",     tags=["auth"])
 app.include_router(analyze.router,  prefix="/analyze",  tags=["analyze"])
 app.include_router(credits.router,  prefix="/credits",  tags=["credits"])
 app.include_router(webhook.router,  prefix="/webhook",  tags=["webhook"])
 
-# Root-level payment callback fallback
 from app.routers.credits import payment_callback
 app.add_api_route("/payment-callback", payment_callback, methods=["GET"], tags=["credits"])
 
