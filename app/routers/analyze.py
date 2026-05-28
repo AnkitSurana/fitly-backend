@@ -1,3 +1,4 @@
+from datetime import datetime, timedelta
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
 from typing import Optional, List
@@ -46,7 +47,7 @@ async def analyze_job(req: AnalyzeRequest, user=Depends(get_current_user)):
             .select("result") \
             .eq("cache_key", cache_key) \
             .eq("user_id", user_id) \
-            .gt("expires_at", "now()") \
+            .gt("expires_at", datetime.utcnow().isoformat()) \
             .maybe_single().execute()
         if cached.data:
             return {**cached.data["result"], "cached": True, "credits_used": 0, "credits_remaining": balance}
@@ -77,7 +78,7 @@ async def analyze_job(req: AnalyzeRequest, user=Depends(get_current_user)):
         "cache_key": cache_key,
         "user_id": user_id,
         "result": result,
-        "expires_at": "now() + interval '24 hours'"
+        "expires_at": (datetime.utcnow() + timedelta(hours=24)).isoformat()
     }).execute()
 
     # 6. Log analytics
