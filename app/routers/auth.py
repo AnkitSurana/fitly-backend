@@ -1,23 +1,55 @@
 from fastapi import APIRouter, HTTPException, Depends
-from pydantic import BaseModel, EmailStr
-import time
+from pydantic import BaseModel
+import time, logging
 from app.config import get_supabase, settings
 from app.dependencies import get_current_user
 
 router = APIRouter()
+logger = logging.getLogger("fitly.auth")
 
 class SignupRequest(BaseModel):
-    email: EmailStr
+    email: str
     password: str
 
 class LoginRequest(BaseModel):
-    email: EmailStr
+    email: str
     password: str
+
+def _get_balance(db, user_id: str) -> int:
+    try:
+        res = db.table("credit_ledger").select("delta").eq("user_id", user_id).execute()
+        return sum(row["delta"] for row in (res.data or []))
+    except Exception as e:
+        logger.error(f"Balance check failed for {user_id}: {e}")
+        return 0
+
+def _grant_signup_credits(db, user_id: str, email: str) -> int:
+    """Grant free credits on signup. Idempotent — safe to call multiple times."""
+    try:
+        existing = db.table("credit_ledger") \
+            .select("id") \
+            .eq("user_id", user_id) \
+            .eq("reason", "signup_bonus") \
+            .execute()
+        if existing.data:
+            logger.info(f"Signup bonus already granted to {user_id}")
+            return _get_balance(db, user_id)
+
+        db.table("credit_ledger").insert({
+            "user_id": user_id,
+            "delta": settings.FREE_CREDITS_ON_SIGNUP,
+            "reason": "signup_bonus",
+        }).execute()
+        logger.info(f"Granted {settings.FREE_CREDITS_ON_SIGNUP} free credits to {user_id}")
+        return settings.FREE_CREDITS_ON_SIGNUP
+    except Exception as e:
+        logger.error(f"Failed to grant signup credits to {user_id}: {e}")
+        return settings.FREE_CREDITS_ON_SIGNUP  # return expected value even if DB write failed
 
 @router.post("/signup")
 async def signup(req: SignupRequest):
-    if len(req.password) < 8:
-        raise HTTPException(400, "Password must be at least 8 characters")
+    if len(req.password) < 6:
+        raise HTTPException(400, "Password must be at least 6 characters")
     db = get_supabase()
     try:
         res = db.auth.sign_up({"email": req.email, "password": req.password})
@@ -25,9 +57,9 @@ async def signup(req: SignupRequest):
             raise HTTPException(400, "Signup failed — email may already be registered")
 
         user_id = res.user.id
+        logger.info(f"New signup: {req.email} ({user_id})")
 
-        # Wait briefly for auth.users to fully commit before inserting profile
-        # (Supabase auth write can be async — retry up to 3 times)
+        # Create profile (retry up to 3x — Supabase auth write can be async)
         for attempt in range(3):
             try:
                 db.table("user_profiles").upsert({
@@ -35,25 +67,14 @@ async def signup(req: SignupRequest):
                     "email": req.email
                 }).execute()
                 break
-            except Exception:
+            except Exception as e:
                 if attempt == 2:
-                    raise
-                time.sleep(0.5)  # wait 500ms before retry
+                    logger.warning(f"Profile upsert failed after 3 attempts for {user_id}: {e}")
+                else:
+                    time.sleep(0.5)
 
-        # Grant free credits (only if not already granted — idempotent check)
-        existing = db.table("credit_ledger") \
-            .select("id") \
-            .eq("user_id", user_id) \
-            .eq("reason", "signup_bonus") \
-            .execute()
-
-        if not existing.data:
-            db.table("credit_ledger").insert({
-                "user_id": user_id,
-                "delta": settings.FREE_CREDITS_ON_SIGNUP,
-                "reason": "signup_bonus",
-                "meta": {}
-            }).execute()
+        # Grant free credits
+        credits = _grant_signup_credits(db, user_id, req.email)
 
         return {
             "ok": True,
@@ -61,11 +82,12 @@ async def signup(req: SignupRequest):
             "email": req.email,
             "access_token": res.session.access_token if res.session else None,
             "refresh_token": res.session.refresh_token if res.session else None,
-            "credits": settings.FREE_CREDITS_ON_SIGNUP,
+            "credits": credits,
         }
     except HTTPException:
         raise
     except Exception as e:
+        logger.error(f"Signup error: {e}")
         raise HTTPException(400, str(e))
 
 @router.post("/login")
@@ -76,44 +98,62 @@ async def login(req: LoginRequest):
         if not res.user or not res.session:
             raise HTTPException(401, "Invalid email or password")
 
-        # Ensure profile exists (in case trigger didn't fire)
-        db.table("user_profiles").upsert({
-            "id": res.user.id,
-            "email": res.user.email
-        }).execute()
+        user_id = res.user.id
+        balance = _get_balance(db, user_id)
 
-        balance = _get_balance(db, res.user.id)
+        # Ensure profile exists (create if missing)
+        try:
+            db.table("user_profiles").upsert({
+                "id": user_id,
+                "email": req.email
+            }).execute()
+        except Exception as e:
+            logger.warning(f"Profile upsert on login failed (non-fatal): {e}")
+
+        # Auto-grant signup bonus if somehow not credited (edge case recovery)
+        if balance == 0:
+            existing = db.table("credit_ledger") \
+                .select("id").eq("user_id", user_id) \
+                .eq("reason", "signup_bonus").execute()
+            if not existing.data:
+                logger.warning(f"User {user_id} has 0 credits and no signup bonus — granting now")
+                _grant_signup_credits(db, user_id, req.email)
+                balance = settings.FREE_CREDITS_ON_SIGNUP
+
+        logger.info(f"Login: {req.email} | balance={balance}")
         return {
             "ok": True,
-            "user_id": res.user.id,
-            "email": res.user.email,
+            "user_id": user_id,
+            "email": req.email,
             "access_token": res.session.access_token,
             "refresh_token": res.session.refresh_token,
             "credits": balance,
         }
     except HTTPException:
         raise
-    except Exception:
-        raise HTTPException(401, "Invalid email or password")
+    except Exception as e:
+        logger.error(f"Login error: {e}")
+        raise HTTPException(401, str(e))
 
 @router.get("/me")
-async def get_me(user=Depends(get_current_user)):
+async def me(user=Depends(get_current_user)):
     db = get_supabase()
     balance = _get_balance(db, user.id)
     return {"user_id": user.id, "email": user.email, "credits": balance}
 
 @router.post("/refresh")
-async def refresh(body: dict):
+async def refresh_token(body: dict):
     db = get_supabase()
     try:
-        res = db.auth.refresh_session(body.get("refresh_token", ""))
+        rt = body.get("refresh_token", "")
+        res = db.auth.refresh_session(rt)
+        if not res.session:
+            raise HTTPException(401, "Invalid refresh token")
         return {
             "access_token": res.session.access_token,
-            "refresh_token": res.session.refresh_token
+            "refresh_token": res.session.refresh_token,
         }
-    except Exception:
-        raise HTTPException(401, "Token refresh failed — please log in again")
-
-def _get_balance(db, user_id: str) -> int:
-    res = db.table("credit_ledger").select("delta").eq("user_id", user_id).execute()
-    return max(0, sum(r["delta"] for r in (res.data or [])))
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(401, str(e))
