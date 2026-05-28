@@ -25,6 +25,7 @@ Respond ONLY with a valid JSON object — no markdown, no backticks:
   "match_score": <0–100 integer>,
   "fit_level": "<strong|medium|weak>",
   "verdict": "<2–3 sentences: specific honest summary citing role, company, evidence>",
+  "resume_strengths": ["<strong point IN the resume: specific skill/experience that stands out>", "<another>", "<another>"],
   "fit_reasons": ["<specific match: JD requires X, resume shows Y>", "<another>", "<another>"],
   "gap_reasons": ["<gap: JD requires X, resume has none>", "<another>"],
   "missing_skills": [
@@ -133,6 +134,7 @@ async def run_analysis(job_data: dict, resume_b64: str | None) -> dict:
         "strong" if result["match_score"] >= 75 else
         "medium" if result["match_score"] >= 45 else "weak"
     )
+    result.setdefault("resume_strengths", [])
     result.setdefault("fit_reasons", [])
     result.setdefault("gap_reasons", [])
     result["missing_skills"] = result.get("missing_skills", [])[:5]
