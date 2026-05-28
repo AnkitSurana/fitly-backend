@@ -155,6 +155,21 @@ def _result_page(success: bool, message: str, credits: int = 0) -> str:
     color = "#1e8e3e" if success else "#d93025"
     bg    = "#e6f4ea" if success else "#fce8e6"
     icon  = "✓" if success else "✕"
+    # Redirect to LinkedIn on success — window.close() blocked by Chrome on redirected tabs
+    redirect_js = """
+    <script>
+      // Try close first, fall back to LinkedIn redirect
+      function goBack() {
+        try { window.close(); } catch(e) {}
+        // If close didn't work, redirect to LinkedIn after 500ms
+        setTimeout(() => {
+          window.location.href = 'https://www.linkedin.com/jobs/';
+        }, 500);
+      }
+      // Auto-redirect on success after 3s
+      """ + ("setTimeout(goBack, 3000);" if success else "") + """
+    </script>""" if success else "<script></script>"
+
     return f"""<!DOCTYPE html>
 <html><head><meta charset="UTF-8"><title>Fitly Payment</title>
 <meta name="viewport" content="width=device-width,initial-scale=1">
@@ -165,15 +180,18 @@ body{{font-family:'Google Sans',system-ui,sans-serif;background:linear-gradient(
 .icon{{width:64px;height:64px;border-radius:50%;background:{bg};color:{color};font-size:28px;font-weight:700;display:flex;align-items:center;justify-content:center;margin:0 auto 16px}}
 h2{{font-size:20px;color:#202124;margin-bottom:8px}}
 p{{font-size:14px;color:#5f6368;line-height:1.6;margin-bottom:20px}}
-.btn{{background:#1a73e8;color:#fff;border:none;border-radius:20px;font-size:14px;font-weight:600;padding:12px 28px;cursor:pointer;font-family:inherit}}
+.btn{{background:#1a73e8;color:#fff;border:none;border-radius:20px;font-size:14px;font-weight:600;padding:12px 28px;cursor:pointer;font-family:inherit;text-decoration:none;display:inline-block}}
+.countdown{{font-size:12px;color:#9aa0a6;margin-top:8px}}
 </style></head>
 <body><div class="card">
 <div class="icon">{icon}</div>
 <h2>{"Payment Complete!" if success else "Payment Failed"}</h2>
 <p>{message}</p>
-<button class="btn" onclick="window.close()">{"Close & Return" if success else "Try Again"}</button>
+<a href="https://www.linkedin.com/jobs/" class="btn">{"Return to LinkedIn →" if success else "Go to LinkedIn"}</a>
+{"<p class='countdown' id='cd'>Redirecting in 3s…</p>" if success else ""}
 </div>
-{"<script>setTimeout(()=>window.close(),4000)</script>" if success else ""}
+{redirect_js}
+{"<script>let s=3;const el=document.getElementById('cd');const t=setInterval(()=>{{s--;if(el)el.textContent='Redirecting in '+s+'s…';if(s<=0){{clearInterval(t);window.location.href='https://www.linkedin.com/jobs/';}}}},1000);</script>" if success else ""}
 </body></html>"""
 
 
