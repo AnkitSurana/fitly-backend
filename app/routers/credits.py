@@ -104,7 +104,8 @@ async def payment_callback(
         return HTMLResponse(content=_result_page(False, "Payment was not completed."))
 
     # Verify HMAC signature
-    msg = f"{razorpay_payment_link_id}|{razorpay_payment_link_reference_id}|{razorpay_payment_id}".encode()
+    # Correct Razorpay Payment Link signature: link_id | ref_id | status | payment_id
+    msg = f"{razorpay_payment_link_id}|{razorpay_payment_link_reference_id}|{razorpay_payment_link_status}|{razorpay_payment_id}".encode()
     expected = hmac.new(
         settings.RAZORPAY_KEY_SECRET.encode(),
         msg, hashlib.sha256
