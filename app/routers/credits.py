@@ -7,7 +7,7 @@ from app.dependencies import get_current_user
 from app.routers.auth import _get_balance
 
 router = APIRouter()
-logger = logging.getLogger("fitly.credits")
+logger = logging.getLogger("applyin.credits")
 
 class CreateOrderRequest(BaseModel):
     package_id: str
@@ -42,7 +42,7 @@ async def create_payment_link(req: CreateOrderRequest, user=Depends(get_current_
             "amount": amount,
             "currency": req.currency,
             "accept_partial": False,
-            "description": f"Fitly — {pkg['credits']} analysis credits",
+            "description": f"Applyin — {pkg['credits']} analysis credits",
             "notes": {
                 "user_id": user.id,
                 "package_id": pkg["id"],
@@ -171,7 +171,7 @@ def _result_page(success: bool, message: str, credits: int = 0) -> str:
     </script>""" if success else "<script></script>"
 
     return f"""<!DOCTYPE html>
-<html><head><meta charset="UTF-8"><title>Fitly Payment</title>
+<html><head><meta charset="UTF-8"><title>Applyin Payment</title>
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <style>
 *{{box-sizing:border-box;margin:0;padding:0}}

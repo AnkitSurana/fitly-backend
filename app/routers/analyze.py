@@ -9,7 +9,7 @@ from app.services.ai import run_analysis
 from app.routers.auth import _get_balance
 
 router = APIRouter()
-logger = logging.getLogger("fitly.analyze")
+logger = logging.getLogger("applyin.analyze")
 
 ANALYSIS_CREDIT_COST = 1
 

@@ -2,7 +2,7 @@ import httpx
 import json
 from app.config import settings
 
-PROMPT_TEMPLATE = """You are Fitly's intelligent matching engine. Your task is to analyse how well a candidate fits a job, then produce a structured report.
+PROMPT_TEMPLATE = """You are Applyin's intelligent matching engine. Your task is to analyse how well a candidate fits a job, then produce a structured report.
 
 Be precise, honest, and specific. Every finding must reference actual content from the JD and resume — no boilerplate.
 

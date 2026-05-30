@@ -8,11 +8,11 @@ from app.routers import auth, analyze, credits, webhook
 import logging
 
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("fitly")
+logger = logging.getLogger("applyin")
 
 limiter = Limiter(key_func=get_remote_address)
 
-app = FastAPI(title="Fitly API", version="1.0.0", docs_url="/docs", redoc_url=None)
+app = FastAPI(title="Applyin API", version="1.0.0", docs_url="/docs", redoc_url=None)
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
@@ -61,7 +61,7 @@ app.add_api_route("/payment-callback", payment_callback, methods=["GET"], tags=[
 
 @app.get("/health")
 def health():
-    return {"status": "ok", "service": "Fitly API"}
+    return {"status": "ok", "service": "Applyin API"}
 
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):

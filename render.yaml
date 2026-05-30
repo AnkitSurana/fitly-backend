@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: fitly-backend
+    name: applyin-backend
     runtime: python
     region: singapore
     plan: free

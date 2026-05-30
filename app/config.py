@@ -10,8 +10,8 @@ class Settings:
     RAZORPAY_KEY_ID: str = os.getenv("RAZORPAY_KEY_ID", "")
     RAZORPAY_KEY_SECRET: str = os.getenv("RAZORPAY_KEY_SECRET", "")
     RAZORPAY_WEBHOOK_SECRET: str = os.getenv("RAZORPAY_WEBHOOK_SECRET", "")
-    APP_URL: str = os.getenv("APP_URL", "https://fitly-backend-fzce.onrender.com").rstrip("/")
-    BACKEND_URL: str = os.getenv("BACKEND_URL", "https://fitly-backend-fzce.onrender.com")
+    APP_URL: str = os.getenv("APP_URL", "https://applyin-backend.onrender.com").rstrip("/")
+    BACKEND_URL: str = os.getenv("BACKEND_URL", "https://applyin-backend.onrender.com")
 
     # Credit packages (credits, price in paise for INR, price in cents for USD)
     CREDIT_PACKAGES = [

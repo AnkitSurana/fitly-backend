@@ -5,7 +5,7 @@ from app.config import get_supabase, get_admin, settings
 from app.dependencies import get_current_user
 
 router = APIRouter()
-logger = logging.getLogger("fitly.auth")
+logger = logging.getLogger("applyin.auth")
 
 # IMPORTANT: never call .auth.sign_up / sign_in / get_user on a client that you
 # then use for .table() writes. Those auth calls adopt the user's session and
@@ -78,6 +78,13 @@ async def signup(req: SignupRequest):
         res = auth_client.auth.sign_up({"email": req.email, "password": req.password})
         if not res.user:
             raise HTTPException(400, "Signup failed — email may already be registered")
+
+        # Supabase returns a user with an EMPTY identities list when the email is
+        # already registered (its signal for "already taken"). Detect and reject,
+        # so repeat signups get a clear message instead of silently "succeeding".
+        identities = getattr(res.user, "identities", None)
+        if identities is not None and len(identities) == 0:
+            raise HTTPException(409, "An account with this email already exists. Please sign in instead.")
 
         user_id = res.user.id
         logger.info(f"New signup: {req.email} ({user_id})")
