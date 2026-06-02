@@ -1,5 +1,5 @@
 -- ═══════════════════════════════════════════════════════════════════════════
--- Fitly — Fresh Install Schema
+-- Applyin — Fresh Install Schema
 -- Run in Supabase SQL Editor. Wipes and recreates everything.
 -- ═══════════════════════════════════════════════════════════════════════════
 
