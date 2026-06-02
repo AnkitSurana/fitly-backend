@@ -453,9 +453,25 @@ async def run_analysis(job_data: dict, resume_b64: str | None) -> dict:
     raw = data["choices"][0]["message"]["content"].strip()
     cleaned = raw.replace("```json", "").replace("```", "").strip()
 
-    try:
-        result = json.loads(cleaned)
-    except json.JSONDecodeError:
+    # Try direct parse first, then fall back to extracting the outermost JSON object.
+    # GPT sometimes wraps output in markdown or adds text before/after the JSON.
+    result = None
+    for attempt in (cleaned, raw):
+        try:
+            result = json.loads(attempt)
+            break
+        except json.JSONDecodeError:
+            pass
+    if result is None:
+        # Extract the outermost {...} block
+        start = cleaned.find('{')
+        end   = cleaned.rfind('}')
+        if start != -1 and end > start:
+            try:
+                result = json.loads(cleaned[start:end + 1])
+            except json.JSONDecodeError:
+                pass
+    if result is None:
         raise Exception("AI returned malformed response. Please try again.")
 
     # ── Compute the final score deterministically in Python ───────────────────

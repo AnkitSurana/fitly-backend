@@ -102,12 +102,23 @@ async def signup(req: SignupRequest):
 
         credits = _grant_signup_credits(admin, user_id)
 
+        # res.session is None when email confirmation is enabled in Supabase —
+        # the user exists but can't log in until they confirm. If you hit this,
+        # go to Supabase Dashboard → Auth → Providers → Email and disable
+        # "Confirm email", or configure a custom SMTP provider.
+        if not res.session:
+            raise HTTPException(
+                503,
+                "Account created but email confirmation is required. "
+                "Check your inbox — or ask your admin to disable email confirmation in Supabase."
+            )
+
         return {
             "ok": True,
             "user_id": user_id,
             "email": req.email,
-            "access_token": res.session.access_token if res.session else None,
-            "refresh_token": res.session.refresh_token if res.session else None,
+            "access_token": res.session.access_token,
+            "refresh_token": res.session.refresh_token,
             "credits": credits,
         }
     except HTTPException:
