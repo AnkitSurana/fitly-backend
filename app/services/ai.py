@@ -197,35 +197,51 @@ CONSISTENCY RULE: identical inputs must produce identical dimension scores.
 ════════════════════════════════════════
 INTERCONNECTION RULES — CRITICAL
 ════════════════════════════════════════
-Every section must flow from the evidence above it. These rules are mandatory:
+Every section must flow directly from the JD text and the resume. These rules are
+ABSOLUTE and non-negotiable:
 
-1. gap_reasons → resume_suggestions (one-to-one where possible)
+ANTI-HALLUCINATION RULE (most important):
+  NEVER mention a skill, tool, technology, or requirement that does not appear
+  word-for-word or by clear synonym in the JD text above.
+  
+  WRONG: JD requires Spark → you list "Azure" as missing (Azure is not in JD)
+  WRONG: JD requires Python → you list "Kubernetes" as missing (not in JD)
+  RIGHT: JD requires "AWS EMR" → if resume lacks it, you list "AWS EMR" as missing
+  
+  Before writing any gap_reason, missing_skill, or resume_suggestion, ask:
+  "Does this specific technology/skill appear in the JD text I was given?"
+  If NO → do not include it. Period.
+
+1. gap_reasons — JD evidence required
+   Format MUST be: "JD requires [exact phrase from JD] — resume has no evidence of this"
+   Only include gaps for things EXPLICITLY stated in the JD.
+   If the resume covers everything in the JD, gap_reasons can have fewer than 2 items.
+
+2. missing_skills — JD-sourced only
+   Each missing skill MUST be a technology/skill named in the JD.
+   If the candidate has everything the JD asks for, missing_skills can be empty [].
+   Never pad with generic skills that "would be useful" but aren't in the JD.
+
+3. gap_reasons → resume_suggestions (one-to-one)
    Each gap_reason that a resume change can address MUST have a corresponding
-   resume_suggestion. If the gap is "no Kubernetes experience", the resume_suggestion
-   must say "Add Kubernetes to skills section if you have any exposure, even personal
-   projects" — not a generic tip. Do not repeat the same gap in both gap_reasons
-   and resume_suggestions without the suggestion adding concrete fix guidance.
+   resume_suggestion with a concrete fix. Do not repeat gaps without adding guidance.
 
-2. gap_reasons + missing_skills → improvement_plan (explicit mapping)
-   Each improvement_plan item must address a specific gap_reason or missing_skill
-   identified above. State which gap it closes. Do not generate generic improvement
-   advice (e.g. "improve communication skills") unless that gap is explicitly in
-   gap_reasons or missing_skills.
+4. gap_reasons + missing_skills → improvement_plan
+   Each plan item must address a specific gap from gap_reasons or missing_skills.
+   No generic advice unless grounded in a JD requirement.
 
-3. resume_suggestions vs improvement_plan — complementary, not duplicative
-   resume_suggestions = what to change in the resume document right now (wording,
-     bullets, sections) to better represent existing experience for THIS role.
-   improvement_plan = what real-world skill/experience to acquire over time to
-     close actual gaps. Never put the same item in both arrays.
+5. resume_suggestions vs improvement_plan — complementary, not duplicative
+   resume_suggestions = change the resume document NOW to represent existing experience.
+   improvement_plan = acquire skills OVER TIME to close real gaps.
+   Never put the same item in both.
 
-4. resume_strengths → fit_reasons (consistent, not contradictory)
-   If you list a strength in resume_strengths, it must also appear as a fit_reason
-   or be acknowledged in the verdict. Do not list a strength and then contradict it
-   in gap_reasons.
+6. resume_strengths → fit_reasons (consistent)
+   Strengths must also appear in fit_reasons or verdict. No contradictions.
 
-5. All arrays must be non-empty when a resume is present. Minimum:
-   resume_strengths: 3, fit_reasons: 3, gap_reasons: 2,
-   resume_suggestions: 3, improvement_plan: 3, missing_skills: 2
+7. Minimum arrays (only when resume present AND genuine evidence exists):
+   resume_strengths: 3 minimum, fit_reasons: 3 minimum.
+   gap_reasons, missing_skills, resume_suggestions, improvement_plan:
+     ONLY include items backed by JD evidence — no padding to hit a minimum count.
 ════════════════════════════════════════
 
 ════════════════════════════════════════
@@ -296,15 +312,17 @@ Respond ONLY with a valid JSON object — no markdown, no backticks:
     "<JD requires X — resume demonstrates Y with evidence Z>"
   ],
   "gap_reasons": [
-    "<JD requires X — resume has no evidence of this>"
+    "<JD requires [exact phrase from JD text] — resume has no evidence of this>"
+    /* Only include if the skill/requirement is literally stated in the JD */
   ],
   "missing_skills": [
     {{
-      "skill": "<name>",
+      "skill": "<name — MUST appear verbatim or by direct synonym in the JD above>",
       "importance": "<critical|important|nice-to-have>",
       "how_to_learn": "<specific course, resource, or project>"
     }}
   ],
+  /* If the candidate's resume covers all JD skills, return missing_skills: [] */
   "improvement_plan": [
     {{
       "action": "<specific action that closes a named gap from gap_reasons or missing_skills>",
